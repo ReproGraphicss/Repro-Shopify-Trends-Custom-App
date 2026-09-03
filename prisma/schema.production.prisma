@@ -1,0 +1,104 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  id                  String    @id @db.VarChar(255)
+  shop                String    @db.VarChar(255)
+  state               String    @db.VarChar(255)
+  isOnline            Boolean   @default(false)
+  scope               String?   @db.Text
+  expires             DateTime?
+  accessToken         String    @db.Text
+  userId              BigInt?
+  firstName           String?   @db.VarChar(255)
+  lastName            String?   @db.VarChar(255)
+  email               String?   @db.VarChar(255)
+  accountOwner        Boolean?  @default(false)
+  locale              String?   @db.VarChar(50)
+  collaborator        Boolean?  @default(false)
+  emailVerified       Boolean?  @default(false)
+  refreshToken        String?   @db.Text
+  refreshTokenExpires DateTime?
+}
+
+model ShopSettings {
+  id                      String   @id @default(cuid()) @db.VarChar(30)
+  shop                    String   @unique @db.VarChar(255)
+  encryptedTrendsToken    String?  @db.Text
+  trendsBaseUrl           String   @default("https://nz.api.trends.nz") @db.VarChar(500)
+  globalMarkupPercent     Float    @default(60)
+  additionalMarkupPercent Float    @default(60)
+  defaultProductStatus    String   @default("DRAFT") @db.VarChar(30)
+  inventoryLocationId     String?  @db.VarChar(255)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
+
+model SyncProduct {
+  id                         String    @id @default(cuid()) @db.VarChar(30)
+  shop                       String    @db.VarChar(255)
+  productCode                String    @db.VarChar(100)
+  title                      String?   @db.Text
+  imageUrl                   String?   @db.Text
+  resolvedProductCode        String?   @db.VarChar(100)
+  sourceFile                 String?   @db.VarChar(500)
+  includedInCurrentSheet     Boolean   @default(true)
+  rowNumber                  Int?
+  metadataJson               String    @default("{}") @db.LongText
+  tagsJson                   String    @default("[]") @db.LongText
+  trendsDataJson             String?   @db.LongText
+  trendsFetchedAt            DateTime?
+  individualMarkup           Float?
+  additionalMarkup           Float?
+  status                     String    @default("PENDING") @db.VarChar(30)
+  lastError                  String?   @db.Text
+  shopifyProductId           String?   @db.VarChar(255)
+  shopifyAdditionalProductId String?   @db.VarChar(255)
+  lastSyncedAt               DateTime?
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+
+  @@unique([shop, productCode])
+  @@index([shop, status])
+  @@index([shop, includedInCurrentSheet])
+}
+
+model TrendsCatalogProduct {
+  id                String   @id @default(cuid()) @db.VarChar(30)
+  shop              String   @db.VarChar(255)
+  productCode       String   @db.VarChar(100)
+  name              String   @db.Text
+  imageUrl          String?  @db.Text
+  categories        String   @default("[]") @db.LongText
+  colours           String?  @db.Text
+  active            String?  @db.VarChar(50)
+  status            String?  @db.VarChar(50)
+  variantCount      Int      @default(0)
+  totalStock        Int      @default(0)
+  rawJson           String   @db.LongText
+  supplierUpdatedAt String?  @db.VarChar(255)
+  refreshedAt       DateTime @default(now())
+
+  @@unique([shop, productCode])
+  @@index([shop, name(length: 191)])
+  @@index([shop, status])
+}
+
+model SyncRun {
+  id         String    @id @default(cuid()) @db.VarChar(30)
+  shop       String    @db.VarChar(255)
+  requested  Int
+  succeeded  Int       @default(0)
+  failed     Int       @default(0)
+  status     String    @default("RUNNING") @db.VarChar(30)
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+
+  @@index([shop, startedAt])
+}

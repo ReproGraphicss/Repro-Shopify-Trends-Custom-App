@@ -1,0 +1,17 @@
+client_id = "6b7ae874ea420980a455395bc28f0188"
+name = "Repro Vendor Management"
+application_url = "https://integrations.reprographics.co.nz"
+embedded = true
+
+[access_scopes]
+scopes = "read_products,write_products,read_inventory,write_inventory,read_locations,read_publications,write_publications"
+
+[webhooks]
+api_version = "2026-07"
+
+[auth]
+redirect_urls = [ "https://integrations.reprographics.co.nz/auth/callback" ]
+
+[build]
+include_config_on_deploy = true
+automatically_update_urls_on_dev = false
