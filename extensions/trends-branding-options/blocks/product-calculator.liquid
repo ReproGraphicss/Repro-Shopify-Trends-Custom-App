@@ -1,0 +1,109 @@
+{% assign trends_config = product.metafields.trends.product_configuration.value %}
+{% if trends_config != blank %}
+  <section
+    id="TrendsCalculator-{{ block.id }}"
+    class="trends-calculator"
+    data-trends-calculator
+    {{ block.shopify_attributes }}
+  >
+    <script type="application/json" data-trends-data>
+      {
+        "configuration": {{ trends_config | json }},
+        "variants": [
+          {% for variant in product.variants %}
+            {
+              "id": {{ variant.id | json }},
+              "title": {{ variant.title | json }},
+              "available": {{ variant.available | json }}
+            }{% unless forloop.last %},{% endunless %}
+          {% endfor %}
+        ]
+      }
+    </script>
+
+    <div class="trends-calculator__header">
+      <p class="trends-calculator__eyebrow">Configure your product</p>
+      <h2>{{ block.settings.heading | escape }}</h2>
+      <p>Choose an option and quantity to see your live price.</p>
+    </div>
+
+    <div class="trends-calculator__layout">
+      <div class="trends-calculator__builder">
+        <div class="trends-step">
+          <div class="trends-step__heading"><span>1</span><h3>Choose your colour</h3></div>
+          <div class="trends-choice-grid" data-variant-options></div>
+        </div>
+
+        <div class="trends-step">
+          <div class="trends-step__heading"><span>2</span><h3>How would you like your product?</h3></div>
+          <div class="trends-mode-grid" data-mode-options>
+            <button type="button" class="trends-card is-active" data-mode="unbranded">
+              <strong>Unbranded</strong><small>Blank product, no branding</small>
+            </button>
+            <button type="button" class="trends-card" data-mode="branding">
+              <strong>Add Branding</strong><small>Add your logo or artwork</small>
+            </button>
+            <button type="button" class="trends-card" data-mode="gift_ready">
+              <strong>Gift Ready</strong><small>Add premium packaging</small>
+            </button>
+          </div>
+        </div>
+
+        <div class="trends-step" data-branding-step hidden>
+          <div class="trends-step__heading"><span>3</span><h3>Choose an option</h3></div>
+          <div class="trends-price-table" data-price-table></div>
+          <div class="trends-method-grid" data-method-options></div>
+        </div>
+
+        <div class="trends-step">
+          <div class="trends-step__heading"><span data-quantity-step>3</span><h3>How many do you need?</h3></div>
+          <div class="trends-quantity-options" data-quantity-options></div>
+          <label class="trends-custom-quantity">
+            <span>Custom quantity</span>
+            <input type="number" min="1" step="1" data-custom-quantity>
+          </label>
+        </div>
+
+        <div class="trends-product-information" data-product-information></div>
+      </div>
+
+      <aside class="trends-summary" aria-live="polite">
+        <p class="trends-summary__eyebrow">Your selection</p>
+        <h3 data-summary-title>{{ product.title | escape }}</h3>
+        <dl>
+          <div><dt>Colour</dt><dd data-summary-variant>—</dd></div>
+          <div><dt>Service</dt><dd data-summary-mode>Unbranded</dd></div>
+          <div><dt>Quantity</dt><dd data-summary-quantity>—</dd></div>
+          <div><dt>Unit price</dt><dd data-summary-unit>—</dd></div>
+          <div data-summary-branding-row hidden><dt>Branding / unit</dt><dd data-summary-branding>—</dd></div>
+          <div data-summary-setup-row hidden><dt>Setup fee</dt><dd data-summary-setup>—</dd></div>
+        </dl>
+        <div class="trends-summary__totals">
+          <div><span>Subtotal (excl. GST)</span><strong data-summary-subtotal>—</strong></div>
+          <div><span>GST</span><strong data-summary-gst>—</strong></div>
+          <div class="trends-summary__grand"><span>Total (incl. GST)</span><strong data-summary-total>—</strong></div>
+        </div>
+        <button type="button" class="trends-add-button" data-add-to-cart>Add selection to cart</button>
+        <p class="trends-feedback" data-feedback role="status"></p>
+      </aside>
+    </div>
+  </section>
+{% endif %}
+
+{% schema %}
+{
+  "name": "TRENDS product calculator",
+  "target": "section",
+  "stylesheet": "trends-calculator.css",
+  "javascript": "trends-calculator.js",
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "Build your product"
+    }
+  ]
+}
+{% endschema %}
+

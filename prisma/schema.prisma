@@ -1,0 +1,110 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
+// enough when changing adapters.
+// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
+datasource db {
+  provider = "sqlite"
+  url      = "file:dev.sqlite"
+}
+
+model Session {
+  id            String    @id
+  shop          String
+  state         String
+  isOnline      Boolean   @default(false)
+  scope         String?
+  expires       DateTime?
+  accessToken   String
+  userId        BigInt?
+  firstName     String?
+  lastName      String?
+  email         String?
+  accountOwner  Boolean   @default(false)
+  locale        String?
+  collaborator  Boolean?  @default(false)
+  emailVerified Boolean?  @default(false)
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+}
+
+model ShopSettings {
+  id                   String   @id @default(cuid())
+  shop                 String   @unique
+  encryptedTrendsToken String?
+  trendsBaseUrl        String   @default("https://nz.api.trends.nz")
+  globalMarkupPercent  Float    @default(60)
+  additionalMarkupPercent Float @default(60)
+  defaultProductStatus String   @default("DRAFT")
+  inventoryLocationId  String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model SyncProduct {
+  id               String   @id @default(cuid())
+  shop             String
+  productCode      String
+  title            String?
+  imageUrl         String?
+  resolvedProductCode String?
+  sourceFile       String?
+  includedInCurrentSheet Boolean @default(true)
+  rowNumber        Int?
+  metadataJson     String   @default("{}")
+  tagsJson         String   @default("[]")
+  trendsDataJson   String?
+  trendsFetchedAt  DateTime?
+  individualMarkup Float?
+  additionalMarkup Float?
+  status           String   @default("PENDING")
+  lastError        String?
+  shopifyProductId String?
+  shopifyAdditionalProductId String?
+  lastSyncedAt     DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([shop, productCode])
+  @@index([shop, status])
+  @@index([shop, includedInCurrentSheet])
+}
+
+model TrendsCatalogProduct {
+  id          String   @id @default(cuid())
+  shop        String
+  productCode String
+  name        String
+  imageUrl    String?
+  categories  String   @default("[]")
+  colours     String?
+  active      String?
+  status      String?
+  variantCount Int     @default(0)
+  totalStock  Int      @default(0)
+  rawJson     String
+  supplierUpdatedAt String?
+  refreshedAt DateTime @default(now())
+
+  @@unique([shop, productCode])
+  @@index([shop, name])
+  @@index([shop, status])
+}
+
+model SyncRun {
+  id         String   @id @default(cuid())
+  shop       String
+  requested  Int
+  succeeded  Int      @default(0)
+  failed     Int      @default(0)
+  status     String   @default("RUNNING")
+  startedAt  DateTime @default(now())
+  finishedAt DateTime?
+
+  @@index([shop, startedAt])
+}
