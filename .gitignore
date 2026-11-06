@@ -1,5 +1,9 @@
 node_modules
 
+# Keep only the root README in the repository; other Markdown notes stay local.
+*.md
+!README.md
+
 # macOS
 .DS_Store
 
