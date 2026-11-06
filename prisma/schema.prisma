@@ -14,61 +14,79 @@ datasource db {
 }
 
 model Session {
-  id            String    @id
-  shop          String
-  state         String
-  isOnline      Boolean   @default(false)
-  scope         String?
-  expires       DateTime?
-  accessToken   String
-  userId        BigInt?
-  firstName     String?
-  lastName      String?
-  email         String?
-  accountOwner  Boolean   @default(false)
-  locale        String?
-  collaborator  Boolean?  @default(false)
-  emailVerified Boolean?  @default(false)
+  id                  String    @id
+  shop                String
+  state               String
+  isOnline            Boolean   @default(false)
+  scope               String?
+  expires             DateTime?
+  accessToken         String
+  userId              BigInt?
+  firstName           String?
+  lastName            String?
+  email               String?
+  accountOwner        Boolean   @default(false)
+  locale              String?
+  collaborator        Boolean?  @default(false)
+  emailVerified       Boolean?  @default(false)
   refreshToken        String?
   refreshTokenExpires DateTime?
 }
 
 model ShopSettings {
-  id                   String   @id @default(cuid())
-  shop                 String   @unique
-  encryptedTrendsToken String?
-  trendsBaseUrl        String   @default("https://nz.api.trends.nz")
-  globalMarkupPercent  Float    @default(60)
-  additionalMarkupPercent Float @default(60)
-  defaultProductStatus String   @default("DRAFT")
-  inventoryLocationId  String?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  id                             String   @id @default(cuid())
+  shop                           String   @unique
+  encryptedTrendsToken           String?
+  trendsBaseUrl                  String   @default("https://nz.api.trends.nz")
+  globalMarkupPercent            Float    @default(60)
+  fixedShippingAmount            Float    @default(15)
+  quoteNotificationEmail         String?
+  quoteWebhookUrl                String?
+  encryptedQuoteWebhookSecret    String?
+  encryptedGoHighLevelApiKey     String?
+  goHighLevelLocationId          String?
+  gstRate                        Float    @default(0.15)
+  pricesExcludeGst               Boolean  @default(true)
+  defaultProductStatus           String   @default("DRAFT")
+  inventoryLocationId            String?
+  productTemplateSuffix          String?
+  shippingProfileId              String?
+  selectedMarketIdsJson          String   @default("[]")
+  selectedPublicationIdsJson     String?
+  variantTypesJson               String   @default("[]")
+  encryptedOpenAiApiKey          String?
+  aiVariantClassificationEnabled Boolean  @default(false)
+  aiVariantModel                 String   @default("gpt-5-mini")
+  createdAt                      DateTime @default(now())
+  updatedAt                      DateTime @updatedAt
 }
 
 model SyncProduct {
-  id               String   @id @default(cuid())
-  shop             String
-  productCode      String
-  title            String?
-  imageUrl         String?
-  resolvedProductCode String?
-  sourceFile       String?
-  includedInCurrentSheet Boolean @default(true)
-  rowNumber        Int?
-  metadataJson     String   @default("{}")
-  tagsJson         String   @default("[]")
-  trendsDataJson   String?
-  trendsFetchedAt  DateTime?
-  individualMarkup Float?
-  additionalMarkup Float?
-  status           String   @default("PENDING")
-  lastError        String?
-  shopifyProductId String?
+  id                         String    @id @default(cuid())
+  shop                       String
+  productCode                String
+  title                      String?
+  imageUrl                   String?
+  resolvedProductCode        String?
+  sourceFile                 String?
+  includedInCurrentSheet     Boolean   @default(true)
+  rowNumber                  Int?
+  metadataJson               String    @default("{}")
+  tagsJson                   String    @default("[]")
+  trendsDataJson             String?
+  trendsFetchedAt            DateTime?
+  individualMarkup           Float?
+  customCorporatePackEnabled Boolean   @default(false)
+  configuredVariantJson      String?
+  configuredVariantEnabled   Boolean   @default(false)
+  status                     String    @default("PENDING")
+  lastError                  String?
+  shopifyProductId           String?
+  shopifyMasterProductId     String?
   shopifyAdditionalProductId String?
-  lastSyncedAt     DateTime?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  lastSyncedAt               DateTime?
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
 
   @@unique([shop, productCode])
   @@index([shop, status])
@@ -76,20 +94,20 @@ model SyncProduct {
 }
 
 model TrendsCatalogProduct {
-  id          String   @id @default(cuid())
-  shop        String
-  productCode String
-  name        String
-  imageUrl    String?
-  categories  String   @default("[]")
-  colours     String?
-  active      String?
-  status      String?
-  variantCount Int     @default(0)
-  totalStock  Int      @default(0)
-  rawJson     String
+  id                String   @id @default(cuid())
+  shop              String
+  productCode       String
+  name              String
+  imageUrl          String?
+  categories        String   @default("[]")
+  colours           String?
+  active            String?
+  status            String?
+  variantCount      Int      @default(0)
+  totalStock        Int      @default(0)
+  rawJson           String
   supplierUpdatedAt String?
-  refreshedAt DateTime @default(now())
+  refreshedAt       DateTime @default(now())
 
   @@unique([shop, productCode])
   @@index([shop, name])
@@ -97,14 +115,95 @@ model TrendsCatalogProduct {
 }
 
 model SyncRun {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   shop       String
   requested  Int
-  succeeded  Int      @default(0)
-  failed     Int      @default(0)
-  status     String   @default("RUNNING")
-  startedAt  DateTime @default(now())
+  succeeded  Int       @default(0)
+  failed     Int       @default(0)
+  status     String    @default("RUNNING")
+  startedAt  DateTime  @default(now())
   finishedAt DateTime?
 
   @@index([shop, startedAt])
+}
+
+model CronSyncLog {
+  id                 String    @id @default(cuid())
+  shop               String
+  mode               String
+  status             String    @default("RUNNING")
+  products           Int       @default(0)
+  processed          Int       @default(0)
+  updated            Int       @default(0)
+  failed             Int       @default(0)
+  remaining          Int       @default(0)
+  priceChecked       Int       @default(0)
+  priceChanged       Int       @default(0)
+  priceUnchanged     Int       @default(0)
+  inventoryChecked   Int       @default(0)
+  inventoryChanged   Int       @default(0)
+  inventoryUnchanged Int       @default(0)
+  durationMs         Int       @default(0)
+  errorsJson         String    @default("[]")
+  detailsJson        String    @default("[]")
+  startedAt          DateTime  @default(now())
+  finishedAt         DateTime?
+
+  @@index([shop, startedAt])
+  @@index([shop, mode])
+}
+
+model TemporaryConfiguredVariant {
+  id                String   @id @default(cuid())
+  shop              String
+  sourceProductId   String
+  sourceVariantId   String
+  targetProductId   String
+  shopifyVariantId  String   @unique
+  productCode       String
+  variantSku        String
+  service           String
+  requestedQuantity Int
+  price             Float
+  configurationJson String
+  expiresAt         DateTime
+  createdAt         DateTime @default(now())
+
+  @@index([shop, expiresAt])
+  @@index([shop, sourceProductId])
+  @@index([shop, targetProductId])
+}
+
+model QuoteRequest {
+  id               String   @id @default(cuid())
+  shop             String
+  customerType     String
+  contactName      String
+  contactPhone     String?
+  contactEmail     String
+  contactCompany   String?
+  productsJson     String
+  marketingConsent Boolean  @default(false)
+  source           String?
+  pageUrl          String?
+  status           String   @default("NEW")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([shop, status])
+  @@index([shop, createdAt])
+}
+
+model QuoteWebhook {
+  id              String   @id @default(cuid())
+  shop            String
+  name            String
+  url             String
+  encryptedSecret String
+  enabled         Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([shop, enabled])
+  @@unique([shop, url])
 }

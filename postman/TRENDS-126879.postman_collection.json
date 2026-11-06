@@ -1,0 +1,125 @@
+{
+  "info": {
+    "_postman_id": "9ff91ea9-b445-4e73-82c0-126879000001",
+    "name": "TRENDS Pricing - SKU 126879",
+    "description": "Postman checks for the Shopify App Proxy pricing and stock endpoints. Requests must go through the Shopify store domain so Shopify can sign the proxy request.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "store_url",
+      "value": "https://repro-graphics-4.myshopify.com"
+    },
+    {
+      "key": "sku",
+      "value": "126879"
+    },
+    {
+      "key": "quantity",
+      "value": "25"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Unbranded price - Qty 25",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"variantSku\": \"{{sku}}\",\n  \"quantity\": {{quantity}},\n  \"brandingSku\": null,\n  \"brandingQuantity\": null,\n  \"packagingSku\": null,\n  \"packagingQuantity\": null,\n  \"shippingService\": null\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{store_url}}/apps/trends/pricing",
+          "host": [
+            "{{store_url}}"
+          ],
+          "path": [
+            "apps",
+            "trends",
+            "pricing"
+          ]
+        },
+        "description": "Returns the live unbranded price using supplier tier price + fixed shipping, then applies the product/global markup once. No Shopify data is changed."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "const data = pm.response.json();",
+              "pm.test('Pricing succeeded', () => pm.expect(data.ok).to.eql(true));",
+              "pm.test('Correct product', () => pm.expect(String(data.productCode)).to.eql('126879'));",
+              "pm.test('Correct quantity', () => pm.expect(data.quantity).to.eql(Number(pm.collectionVariables.get('quantity'))));",
+              "pm.test('Fixed shipping is included', () => pm.expect(data.shippingCharge).to.be.a('number'));",
+              "pm.test('Final unit price returned', () => pm.expect(data.unitPrice).to.be.a('number'));"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Product stock - Parent SKU",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{store_url}}/apps/trends/stock?sku={{sku}}",
+          "host": [
+            "{{store_url}}"
+          ],
+          "path": [
+            "apps",
+            "trends",
+            "stock"
+          ],
+          "query": [
+            {
+              "key": "sku",
+              "value": "{{sku}}"
+            }
+          ]
+        },
+        "description": "Returns every colour/stock variant for parent SKU 126879. No Shopify data is changed."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "const data = pm.response.json();",
+              "pm.test('Stock lookup succeeded', () => pm.expect(data.ok).to.eql(true));",
+              "pm.test('Correct parent SKU', () => pm.expect(String(data.mainSku)).to.eql('126879'));",
+              "pm.test('Stock list returned', () => pm.expect(data.stock).to.be.an('array'));"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -8,53 +8,77 @@ export const loader = async ({ request }) => {
   const activeWhere = {
     shop: session.shop,
     sourceFile: { not: null },
-    includedInCurrentSheet: true,
   };
-  const [counts, recentProducts, recentRuns, settings] = await Promise.all([
-    prisma.syncProduct.groupBy({
-      by: ["status"],
-      where: activeWhere,
-      _count: { _all: true },
-    }),
-    prisma.syncProduct.findMany({
-      where: activeWhere,
-      orderBy: { updatedAt: "desc" },
-      take: 6,
-      select: {
-        id: true,
-        productCode: true,
-        title: true,
-        imageUrl: true,
-        status: true,
-        updatedAt: true,
-      },
-    }),
-    prisma.syncRun.findMany({
-      where: { shop: session.shop },
-      orderBy: { startedAt: "desc" },
-      take: 5,
-    }),
-    prisma.shopSettings.upsert({
-      where: { shop: session.shop },
-      create: { shop: session.shop },
-      update: {},
-    }),
-  ]);
+  const [counts, recentProducts, recentCronRuns, recentRuns, settings] =
+    await Promise.all([
+      prisma.syncProduct.groupBy({
+        by: ["status"],
+        where: activeWhere,
+        _count: { _all: true },
+      }),
+      prisma.syncProduct.findMany({
+        where: activeWhere,
+        orderBy: { updatedAt: "desc" },
+        take: 6,
+        select: {
+          id: true,
+          productCode: true,
+          title: true,
+          imageUrl: true,
+          status: true,
+          updatedAt: true,
+        },
+      }),
+      prisma.cronSyncLog.findMany({
+        where: { shop: session.shop },
+        orderBy: { startedAt: "desc" },
+        take: 12,
+        select: {
+          id: true,
+          mode: true,
+          status: true,
+          processed: true,
+          updated: true,
+          failed: true,
+          remaining: true,
+          durationMs: true,
+          startedAt: true,
+        },
+      }),
+      prisma.syncRun.findMany({
+        where: { shop: session.shop },
+        orderBy: { startedAt: "desc" },
+        take: 6,
+      }),
+      prisma.shopSettings.upsert({
+        where: { shop: session.shop },
+        create: { shop: session.shop },
+        update: {},
+      }),
+    ]);
   return {
     counts: Object.fromEntries(
       counts.map((item) => [item.status, item._count._all]),
     ),
     recentProducts,
-    recentRuns,
+    recentCronRuns: recentCronRuns.map((run) => ({
+      ...run,
+      startedAt: run.startedAt.toISOString(),
+    })),
+    recentRuns: recentRuns.map((run) => ({
+      ...run,
+      startedAt: run.startedAt.toISOString(),
+      finishedAt: run.finishedAt?.toISOString() || null,
+    })),
     globalMarkupPercent: settings.globalMarkupPercent,
-    configured: Boolean(
-      settings.encryptedTrendsToken || process.env.TRENDS_API_TOKEN,
-    ),
+    configured: Boolean(settings.encryptedTrendsToken),
   };
 };
 
 export default function Dashboard() {
   const data = useLoaderData();
+  const recentProducts = data.recentProducts || [];
+  const recentCronRuns = data.recentCronRuns || [];
   const pending = (data.counts.PENDING || 0) + (data.counts.FETCHING || 0);
   const fetched = data.counts.FETCHED || 0;
   const synced = data.counts.SYNCED || 0;
@@ -71,9 +95,16 @@ export default function Dashboard() {
     { label: "Synced", value: synced, className: "synced" },
     { label: "Failed", value: failed, className: "failed" },
   ];
+  const activityRuns = [...recentCronRuns].reverse();
+  const maxActivity = Math.max(
+    1,
+    ...activityRuns.map((run) =>
+      Math.max(run.processed, run.updated + run.failed),
+    ),
+  );
 
   return (
-    <s-page heading="Dashboard" inlineSize="large">
+    <s-page heading="Overview" inlineSize="large">
       <s-button slot="primary-action" variant="primary" href="/app/products">
         Manage products
       </s-button>
@@ -83,7 +114,7 @@ export default function Dashboard() {
             <p className="trends-eyebrow">TRENDS commerce operations</p>
             <h2>Supplier-to-Shopify overview</h2>
             <p>
-              Monitor the current sheet, supplier data readiness and Shopify
+              Monitor the imported catalog, supplier data readiness and Shopify
               publishing progress from one place.
             </p>
           </div>
@@ -97,9 +128,9 @@ export default function Dashboard() {
 
         <section className="trends-metrics">
           <DashboardMetric
-            label="Sheet products"
+            label="TRENDS products"
             value={total}
-            hint="Current upload"
+            hint="All sheet uploads"
           />
           <DashboardMetric
             label="Ready to sync"
@@ -126,7 +157,7 @@ export default function Dashboard() {
             <div className="trends-card__header">
               <div>
                 <h3>Sync health</h3>
-                <p>Current sheet status distribution</p>
+                <p>Imported catalog status distribution</p>
               </div>
               <s-badge tone={failed ? "warning" : "success"}>
                 {failed ? `${failed} need attention` : "Healthy"}
@@ -169,27 +200,56 @@ export default function Dashboard() {
           <div className="trends-card">
             <div className="trends-card__header">
               <div>
-                <h3>Quick actions</h3>
-                <p>Continue the most common workflows</p>
+                <h3>Automation activity</h3>
+                <p>Items processed in the latest 12 cron runs</p>
               </div>
+              <s-button href="/app/logs">View activity</s-button>
             </div>
-            <div className="trends-card__body trends-quick-actions">
-              <a href="/app/products">
-                <strong>Upload and manage SKUs</strong>
-                <span>Import a sheet, fetch details and sync products</span>
-                <b>→</b>
-              </a>
-              <a href="/app/products?status=FAILED">
-                <strong>Review failed items</strong>
-                <span>Inspect supplier or Shopify sync errors</span>
-                <b>→</b>
-              </a>
-              <a href="/app/settings">
-                <strong>Integration settings</strong>
-                <span>Manage the API, markup and inventory location</span>
-                <b>→</b>
-              </a>
-            </div>
+            {activityRuns.length ? (
+              <div className="trends-activity-chart">
+                <div className="trends-activity-chart__plot">
+                  {activityRuns.map((run) => {
+                    const successful = Math.max(0, run.updated);
+                    const failedCount = Math.max(0, run.failed);
+                    return (
+                      <div
+                        className="trends-activity-bar"
+                        key={run.id}
+                        title={`${automationName(run.mode)}: ${run.processed} processed, ${successful} successful, ${failedCount} failed`}
+                      >
+                        <div>
+                          <span
+                            className="is-failed"
+                            style={{
+                              height: `${(failedCount / maxActivity) * 100}%`,
+                            }}
+                          />
+                          <span
+                            className="is-success"
+                            style={{
+                              height: `${(successful / maxActivity) * 100}%`,
+                            }}
+                          />
+                        </div>
+                        <small>{automationShortName(run.mode)}</small>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="trends-activity-legend">
+                  <span>
+                    <i className="is-success" />
+                    Successful
+                  </span>
+                  <span>
+                    <i className="is-failed" />
+                    Failed
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <DashboardEmpty text="Automation activity will appear after the first cron run." />
+            )}
           </div>
         </section>
 
@@ -198,13 +258,13 @@ export default function Dashboard() {
             <div className="trends-card__header">
               <div>
                 <h3>Recently updated products</h3>
-                <p>Latest activity in the current sheet</p>
+                <p>Latest activity across all uploaded sheets</p>
               </div>
               <s-button href="/app/products">View all</s-button>
             </div>
-            {data.recentProducts.length ? (
+            {recentProducts.length ? (
               <div className="trends-dashboard-list">
-                {data.recentProducts.map((product) => (
+                {recentProducts.map((product) => (
                   <div key={product.id} className="trends-dashboard-product">
                     <div className="trends-thumb">
                       {product.imageUrl ? (
@@ -231,24 +291,26 @@ export default function Dashboard() {
           <div className="trends-card">
             <div className="trends-card__header">
               <div>
-                <h3>Recent sync runs</h3>
-                <p>Latest Shopify publishing results</p>
+                <h3>Latest automation runs</h3>
+                <p>Recent background sync activity</p>
               </div>
+              <s-button href="/app/logs">View all</s-button>
             </div>
-            {data.recentRuns.length ? (
+            {recentCronRuns.length ? (
               <div className="trends-dashboard-list">
-                {data.recentRuns.map((run) => (
+                {recentCronRuns.slice(0, 6).map((run) => (
                   <div key={run.id} className="trends-run-row">
                     <div>
-                      <strong>
-                        {new Date(run.startedAt).toLocaleString()}
-                      </strong>
-                      <span>{run.requested} products requested</span>
+                      <strong>{automationName(run.mode)}</strong>
+                      <span>
+                        {new Date(run.startedAt).toLocaleString()} ·{" "}
+                        {run.processed} processed
+                      </span>
                     </div>
                     <div>
                       <StatusPill status={run.status} />
                       <small>
-                        {run.succeeded} synced · {run.failed} failed
+                        {run.updated} successful · {run.failed} failed
                       </small>
                     </div>
                   </div>
@@ -263,6 +325,19 @@ export default function Dashboard() {
     </s-page>
   );
 }
+
+const automationName = (mode) =>
+  ({
+    prices: "Price & quantity sync",
+    full: "Daily product sync",
+    cleanup: "Temporary item cleanup",
+    catalog: "Product sync",
+  })[mode] || mode;
+
+const automationShortName = (mode) =>
+  ({ prices: "P&Q", full: "Full", cleanup: "Clean", catalog: "Product" })[
+    mode
+  ] || "Sync";
 
 function DashboardMetric({ label, value, hint, tone = "" }) {
   return (

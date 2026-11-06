@@ -1,0 +1,14 @@
+{% if request.page_type == 'product' and product.tags contains 'TRENDS Hidden Product' %}
+  <style>body { visibility: hidden !important; }</style>
+  <script>
+    window.location.replace('{{ routes.cart_url }}');
+  </script>
+{% endif %}
+
+{% schema %}
+{
+  "name": "Hide configured products",
+  "target": "body",
+  "settings": []
+}
+{% endschema %}

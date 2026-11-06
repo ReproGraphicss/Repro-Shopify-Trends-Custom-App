@@ -20,6 +20,14 @@ const readInput = async (request) => {
         url.searchParams.get("variantSku") || url.searchParams.get("sku"),
       quantity: url.searchParams.get("quantity") || url.searchParams.get("qty"),
       brandingSku: url.searchParams.get("brandingSku"),
+      brandingQuantity: url.searchParams.get("brandingQuantity"),
+      packagingSku:
+        url.searchParams.get("packagingSku") ||
+        url.searchParams.get("giftBoxSku"),
+      packagingQuantity: url.searchParams.get("packagingQuantity"),
+      shippingService:
+        url.searchParams.get("shippingService") ||
+        url.searchParams.get("freightService"),
     };
   const contentType = request.headers.get("content-type") || "";
   if (contentType.includes("application/json")) return request.json();
@@ -40,7 +48,6 @@ const findSyncedProduct = async (shop, variantSku) => {
       resolvedProductCode: true,
       trendsDataJson: true,
       individualMarkup: true,
-      additionalMarkup: true,
     },
     orderBy: { lastSyncedAt: "desc" },
   });
@@ -69,15 +76,25 @@ const handle = async (request) => {
   try {
     const input = await readInput(request);
     const variantSku = String(input.variantSku || "").trim();
-    const quantity = Math.trunc(Number(input.quantity));
+    const quantity = Math.trunc(
+      Number(input.productQuantity ?? input.quantity),
+    );
     const brandingSku = String(input.brandingSku || "").trim() || null;
+    const packagingSku =
+      String(input.packagingSku || input.giftBoxSku || "").trim() || null;
     if (!variantSku)
       return response({ ok: false, message: "variantSku is required" }, 400);
-    if (!Number.isFinite(quantity) || quantity < 1)
+    if (!Number.isFinite(quantity) || quantity < 1 || quantity > 100000)
       return response(
-        { ok: false, message: "quantity must be a positive integer" },
+        { ok: false, message: "quantity must be between 1 and 100000" },
         400,
       );
+    const selectedQuantity = (value, label) => {
+      const result = Math.trunc(Number(value ?? quantity));
+      if (!Number.isFinite(result) || result < 1 || result > 100000)
+        throw new Error(`${label} must be between 1 and 100000`);
+      return result;
+    };
 
     const match = await findSyncedProduct(session.shop, variantSku);
     if (!match)
@@ -93,19 +110,35 @@ const handle = async (request) => {
       quantity,
       markupPercent:
         match.row.individualMarkup ?? settings?.globalMarkupPercent ?? 0,
-      additionalMarkupPercent:
-        match.row.additionalMarkup ?? settings?.additionalMarkupPercent ?? 0,
-      brandingSku,
+      fixedShippingAmount: settings?.fixedShippingAmount ?? 15,
+      additionalSelections: [
+        brandingSku
+          ? {
+              sku: brandingSku,
+              quantity: selectedQuantity(
+                input.brandingQuantity,
+                "brandingQuantity",
+              ),
+            }
+          : null,
+        packagingSku
+          ? {
+              sku: packagingSku,
+              quantity: selectedQuantity(
+                input.packagingQuantity,
+                "packagingQuantity",
+              ),
+            }
+          : null,
+      ].filter(Boolean),
+      shippingService: input.shippingService || input.freightService,
     });
     return response({
       ok: true,
       currency: "NZD",
-      excludesGst: true,
-      gstRate: 0.15,
       productCode: String(match.product.code),
       variantSku,
       ...result,
-      totalIncludingGst: Number((result.subtotal * 1.15).toFixed(2)),
     });
   } catch (error) {
     return response(

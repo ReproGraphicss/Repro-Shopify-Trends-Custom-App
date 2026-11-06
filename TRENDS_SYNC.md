@@ -34,9 +34,18 @@ Authorization: Bearer <CRON_SECRET>
 
 The daily mode refreshes only products whose local status is `SYNCED`. It updates the Shopify title, description, images, variants, tags, status, complete quantity-break configuration, branding options, setup charges, prices and inventory. The normal endpoint remains the lightweight ten-minute price/inventory/tier-metafield refresh.
 
-# Storefront quantity pricing API
+# Storefront quantity pricing
 
-The calculator API route is implemented at `/api/storefront/pricing`. In production, expose it on the store domain through a Shopify app proxy such as `/apps/trends-pricing` after the app has a public HTTPS host. Do not enable `[app_proxy]` in the localhost development configuration because Shopify requires a public host for app proxies.
+Product sync writes the complete calculator configuration to the
+`trends.product_configuration` JSON metafield. The storefront uses that
+metafield for instant quantity, branding, packaging, shipping, markup and GST
+calculation without a request on every selection change. Only **Add to cart**
+calls the configuration endpoint, where the server recalculates the price and
+creates or reuses the configured Shopify variant.
+
+The read-only pricing verification route is implemented at
+`/api/storefront/pricing` and exposed through the Shopify app proxy at
+`/apps/trends/pricing`.
 
 ```text
 POST /apps/trends-pricing

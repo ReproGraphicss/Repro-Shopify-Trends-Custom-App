@@ -1,254 +1,352 @@
+"use strict";
 (() => {
-  const money=(value,currency)=>new Intl.NumberFormat("en-NZ",{style:"currency",currency:currency||"NZD"}).format(Number(value||0));
-  const escapeHtml=(value)=>{const node=document.createElement("span");node.textContent=String(value??"");return node.innerHTML};
-
-  const init = (root) => {
-    if (root.dataset.initialized) return;
-    root.dataset.initialized = "true";
-    const payload=JSON.parse(root.querySelector("[data-trends-data]").textContent);
-    const config = payload.configuration || {};
-    const variants = payload.variants || [];
-    const breaks = [...(config.quantityBreaks || [])].sort(
-      (first, second) => first.quantity - second.quantity,
-    );
-    const state = {
-      variant: variants.find((variant) => variant.available) || variants[0],
-      mode: "unbranded",
-      method: null,
-      quantity: Number(breaks[0]?.quantity || 1),
-    };
-    const find=(selector)=>root.querySelector(selector),findAll=(selector)=>[...root.querySelectorAll(selector)];
-
-    const methodsForMode = () =>
-      (config.brandingMethods || []).filter(
-        (method) => method.mode === state.mode,
-      );
-    const activeBreak = () =>
-      breaks.filter((price) => state.quantity >= price.quantity).pop() ||
-      breaks[0] || { unitPrice: 0 };
-    const selection = () => {
-      const unit = Number(activeBreak().unitPrice || 0);
-      const branding =
-        state.mode === "unbranded" ? 0 : Number(state.method?.unitPrice || 0);
-      const setup =
-        state.mode === "unbranded" ? 0 : Number(state.method?.setupPrice || 0);
-      const subtotal = (unit + branding) * state.quantity + setup;
-      const gst = config.excludesGst
-        ? subtotal * Number(config.gstRate || 0)
-        : 0;
-      return { unit, branding, setup, subtotal, gst, total: subtotal + gst };
-    };
-
-    const renderVariants = () => {
-      find("[data-variant-options]").innerHTML = variants
-        .map(
-          (variant) =>
-            `<button type="button" class="trends-pill ${variant.id === state.variant?.id ? "is-active" : ""}" data-variant-id="${variant.id}" ${variant.available ? "" : "disabled"}>${escapeHtml(variant.title)}</button>`,
-        )
-        .join("");
-    };
-
-    const renderModes = () => {
-      for (const mode of ["branding", "gift_ready"]) {
-        const button = find(`[data-mode="${mode}"]`);
-        button.hidden = !(config.brandingMethods || []).some(
-          (method) => method.mode === mode,
-        );
-      }
-      findAll("[data-mode]").forEach((button) =>
-        button.classList.toggle(
-          "is-active",
-          button.dataset.mode === state.mode,
+  const b = (u, f) =>
+      new Intl.NumberFormat("en-NZ", {
+        style: "currency",
+        currency: f || "NZD",
+      }).format(Number(u || 0)),
+    s = (u) => {
+      const f = document.createElement("span");
+      return ((f.textContent = String(u ?? "")), f.innerHTML);
+    },
+    I = (u) => {
+      if (u.dataset.initialized) return;
+      u.dataset.initialized = "true";
+      const f = JSON.parse(u.querySelector("[data-trends-data]").textContent),
+        r = f.configuration || {},
+        $ = f.variants || [],
+        v = r.custom_variant_configuration || null,
+        M = v !== null && v.enabled !== !0,
+        q = v?.enabled
+          ? [...(v.options || [])].sort((t, i) =>
+              t.key === v.primaryOptionKey
+                ? -1
+                : i.key === v.primaryOptionKey
+                  ? 1
+                  : 0,
+            )
+          : [],
+        O = new Map($.map((t) => [String(t.sku || ""), t])),
+        x = q.length
+          ? (v.variants || [])
+              .map((t) => {
+                const i = O.get(String(t.sku || ""));
+                return i ? { ...i, configured: t } : null;
+              })
+              .filter(Boolean)
+          : [],
+        w = x.length > 0,
+        L = w
+          ? x.find((t) => t.available) || x[0]
+          : $.find((t) => t.available) || $[0],
+        S = [...(r.quantityBreaks || [])].sort(
+          (t, i) => t.quantity - i.quantity,
         ),
-      );
-    };
-
-    const renderMethods = () => {
-      const methods = methodsForMode();
-      if (!methods.some((method) => method.id === state.method?.id))
-        state.method = methods[0] || null;
-      find("[data-branding-step]").hidden = state.mode === "unbranded";
-      find("[data-quantity-step]").textContent =
-        state.mode === "unbranded" ? "3" : "4";
-      find("[data-method-options]").innerHTML = methods
-        .map(
-          (method) =>
-            `<button type="button" class="trends-method ${method.id === state.method?.id ? "is-active" : ""}" data-method-id="${escapeHtml(method.id)}"><strong>${escapeHtml(method.name)}</strong><small>${escapeHtml(method.area || method.description)}</small><span>From ${money(method.unitPrice, config.currency)} / unit</span></button>`,
-        )
-        .join("");
-      const columns = breaks
-        .map((price) => `<th>${price.quantity}</th>`)
-        .join("");
-      const rows = methods
-        .map(
-          (method) =>
-            `<tr><th>${escapeHtml(method.name)}</th>${breaks
-              .map(
-                (price) =>
-                  `<td>${money(Number(price.unitPrice) + Number(method.unitPrice), config.currency)}</td>`,
-              )
-              .join(
-                "",
-              )}</tr><tr class="trends-setup-row"><th>Setup fee</th><td colspan="${Math.max(1, breaks.length)}">${money(method.setupPrice, config.currency)}</td></tr>`,
-        )
-        .join("");
-      find("[data-price-table]").innerHTML = methods.length
-        ? `<table><thead><tr><th>Quantity</th>${columns}</tr></thead><tbody>${rows}</tbody></table>`
-        : "";
-    };
-
-    const renderQuantities = () => {
-      find("[data-quantity-options]").innerHTML = breaks
-        .map(
-          (price) =>
-            `<button type="button" class="trends-pill ${price.quantity === state.quantity ? "is-active" : ""}" data-quantity="${price.quantity}">${price.quantity}</button>`,
-        )
-        .join("");
-      find("[data-custom-quantity]").value = state.quantity;
-    };
-
-    const renderInformation = () => {
-      const specs = config.specifications || [];
-      find("[data-product-information]").innerHTML = `
-        <details open><summary>Product details & specifications</summary>
-          ${config.packaging ? `<p><strong>Packaging:</strong> ${escapeHtml(config.packaging)}</p>` : ""}
-          <dl>${specs.map((item) => `<div><dt>${escapeHtml(item.specification)}</dt><dd>${escapeHtml(item.description)}</dd></div>`).join("")}</dl>
-        </details>`;
-    };
-
-    const renderSummary = () => {
-      const totals = selection();
-      find("[data-summary-variant]").textContent = state.variant?.title || "—";
-      find("[data-summary-mode]").textContent =
-        state.mode === "unbranded" ? "Unbranded" : state.method?.name || "—";
-      find("[data-summary-quantity]").textContent = state.quantity;
-      find("[data-summary-unit]").textContent = money(
-        totals.unit,
-        config.currency,
-      );
-      find("[data-summary-branding]").textContent = money(
-        totals.branding,
-        config.currency,
-      );
-      find("[data-summary-setup]").textContent = money(
-        totals.setup,
-        config.currency,
-      );
-      find("[data-summary-subtotal]").textContent = money(
-        totals.subtotal,
-        config.currency,
-      );
-      find("[data-summary-gst]").textContent = money(
-        totals.gst,
-        config.currency,
-      );
-      find("[data-summary-total]").textContent = money(
-        totals.total,
-        config.currency,
-      );
-      find("[data-summary-branding-row]").hidden = state.mode === "unbranded";
-      find("[data-summary-setup-row]").hidden =
-        state.mode === "unbranded" || totals.setup <= 0;
-      find("[data-add-to-cart]").disabled =
-        !state.variant ||
-        (state.mode !== "unbranded" && !state.method?.unitVariantId);
-    };
-
-    const render = () => {
-      renderVariants();
-      renderModes();
-      renderMethods();
-      renderQuantities();
-      renderSummary();
-    };
-
-    root.addEventListener("click", async (event) => {
-      const variant = event.target.closest("[data-variant-id]");
-      const mode = event.target.closest("[data-mode]");
-      const method = event.target.closest("[data-method-id]");
-      const quantity = event.target.closest("[data-quantity]");
-      if (variant)
-        state.variant = variants.find(
-          (item) => String(item.id) === variant.dataset.variantId,
-        );
-      if (mode) state.mode = mode.dataset.mode;
-      if (method)
-        state.method = methodsForMode().find(
-          (item) => item.id === method.dataset.methodId,
-        );
-      if (quantity) state.quantity = Number(quantity.dataset.quantity);
-      if (variant || mode || method || quantity) return render();
-      if (!event.target.closest("[data-add-to-cart]")) return;
-
-      const button = find("[data-add-to-cart]");
-      const feedback = find("[data-feedback]");
-      button.disabled = true;
-      button.textContent = "Adding…";
-      const items = [
-        {
-          id: Number(state.variant.id),
-          quantity: state.quantity,
-          properties: {
-            "Product service":
-              state.mode === "unbranded" ? "Unbranded" : state.method.name,
-          },
+        a = {
+          variant: L,
+          attributes: { ...(L?.configured?.attributes || {}) },
+          mode: "unbranded",
+          method: null,
+          packaging:
+            (r.packagingMethods || []).find((t) => t.type === "standard") ||
+            null,
+          quantity: Number(S[0]?.quantity || 1),
         },
-      ];
-      if (state.mode !== "unbranded" && state.method?.unitVariantId) {
-        items.push({
-          id: Number(String(state.method.unitVariantId).split("/").pop()),
-          quantity: state.quantity,
-          properties: {
-            "For product": config.productCode,
-            "Charge type": "Per unit",
-          },
-        });
-        if (state.method.setupVariantId && Number(state.method.setupPrice) > 0)
-          items.push({
-            id: Number(String(state.method.setupVariantId).split("/").pop()),
-            quantity: 1,
-            properties: {
-              "For product": config.productCode,
-              "Charge type": "Setup fee",
+        e = (t) => u.querySelector(t),
+        H = (t) => [...u.querySelectorAll(t)],
+        P = () =>
+          a.mode === "branding"
+            ? (r.brandingMethods || []).filter(
+                (t) => !t.mode || t.mode === "branding",
+              )
+            : [],
+        A = () =>
+          S.filter((t) => a.quantity >= t.quantity).pop() ||
+          S[0] || { unitPrice: 0 },
+        _ = () => {
+          const t = Number(A().unitPrice || 0),
+            i = a.mode === "unbranded" ? 0 : Number(a.method?.unitPrice || 0),
+            n = a.mode === "unbranded" ? 0 : Number(a.method?.setupPrice || 0),
+            o = Number(a.packaging?.unitPrice || 0),
+            k = Number(a.packaging?.setupPrice || 0),
+            g = n + k,
+            p = Number(r.fixedShippingAmount || 0),
+            y =
+              ((t + i + o) * a.quantity + g + p) *
+              (1 + Number(r.markupPercent || 0) / 100);
+          return {
+            unit: y / a.quantity,
+            branding: i,
+            packaging: o,
+            setup: g,
+            shipping: {
+              id: "fixed",
+              service: "fixed",
+              name: "Fixed shipping and handling",
             },
-          });
-      }
-      try {
-        const response = await fetch(
-          `${window.Shopify?.routes?.root || "/"}cart/add.js`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "application/json",
-            },
-            body: JSON.stringify({ items }),
-          },
-        );
-        const result = await response.json();
-        if (!response.ok)
-          throw new Error(result.description || "Could not add this selection");
-        feedback.textContent = "Selection added to cart.";
-        document.dispatchEvent(
-          new CustomEvent("cart:refresh", { bubbles: true }),
-        );
-      } catch (error) {
-        feedback.textContent = error.message;
-      } finally {
-        button.disabled = false;
-        button.textContent = "Add selection to cart";
-      }
-    });
-
-    find("[data-custom-quantity]").addEventListener("input", (event) => {
-      state.quantity = Math.max(1, Math.trunc(Number(event.target.value) || 1));
-      renderQuantities();
-      renderSummary();
-    });
-    renderInformation();render();
-  };
-
-  const initialize=()=>document.querySelectorAll("[data-trends-calculator]").forEach(init);
-  for(const event of ["DOMContentLoaded","shopify:section:load"])document.addEventListener(event,initialize);
-  initialize();
+            shippingCharge: p,
+            subtotal: y,
+          };
+        },
+        B = () => {
+          const t = e("[data-variant-step]");
+          if ((t && (t.hidden = M), M)) {
+            e("[data-variant-options]").innerHTML = "";
+            return;
+          }
+          if (
+            (e("[data-variant-options]").classList.toggle(
+              "trends-configured-options",
+              w,
+            ),
+            !w)
+          ) {
+            e("[data-variant-options]").innerHTML = $.map(
+              (n) =>
+                `<button type="button" class="trends-pill ${n.id === a.variant?.id ? "is-active" : ""}" data-variant-id="${n.id}" ${n.available ? "" : "disabled"}>${s(n.title)}</button>`,
+            ).join("");
+            return;
+          }
+          ((e("[data-variant-heading]").textContent = "Choose your options"),
+            (e("[data-summary-variant-label]").textContent = "Selection"));
+          const i = q
+            .map((n, o) => {
+              const k = q.slice(0, o),
+                g = x.filter((c) =>
+                  k.every((d) => {
+                    const m = a.attributes[d.name];
+                    return !m || c.configured.attributes?.[d.name] === m;
+                  }),
+                ),
+                p = [
+                  ...new Set(
+                    g
+                      .map((c) => c.configured.attributes?.[n.name])
+                      .filter(Boolean),
+                  ),
+                ];
+              if (!p.length) return "";
+              const y = p
+                .map((c) => {
+                  const d = g.some(
+                      (h) =>
+                        h.available && h.configured.attributes?.[n.name] === c,
+                    ),
+                    m = n.displayValues?.[c] || c;
+                  return `<button type="button" class="trends-pill ${a.attributes[n.name] === c ? "is-active" : ""}" data-configured-option="${s(n.key)}" data-configured-value="${s(c)}" ${d ? "" : "disabled"}>${s(m)}</button>`;
+                })
+                .join("");
+              return `<div class="trends-configured-option"><h4>${s(n.name)}</h4><div class="trends-choice-grid">${y}</div></div>`;
+            })
+            .join("");
+          e("[data-variant-options]").innerHTML = i;
+        },
+        F = () => {
+          for (const t of ["branding"]) {
+            const i = e(`[data-mode="${t}"]`),
+              n = (r.brandingMethods || []).filter(
+                (o) => !o.mode || o.mode === "branding",
+              );
+            i.hidden = !n.length;
+          }
+          H("[data-mode]").forEach((t) =>
+            t.classList.toggle("is-active", t.dataset.mode === a.mode),
+          );
+        },
+        J = () => {
+          const t = P();
+          (t.some((i) => i.id === a.method?.id) || (a.method = t[0] || null),
+            (e("[data-branding-step]").hidden = a.mode === "unbranded"),
+            (e("[data-quantity-step]").textContent = "4"),
+            (e("[data-method-options]").innerHTML = t
+              .map(
+                (i) =>
+                  `<button type="button" class="trends-method ${i.id === a.method?.id ? "is-active" : ""}" data-method-id="${s(i.id)}"><strong>${s(i.name)}</strong><small>${s(i.area || i.description)}</small><span>From ${b(i.unitPrice, r.currency)} / unit</span></button>`,
+              )
+              .join("")),
+            (e("[data-price-table]").innerHTML = ""));
+        },
+        Q = () => {
+          const t = r.packagingMethods || [],
+            i = e("[data-packaging-options]");
+          ((e("[data-packaging-step]").hidden = !t.length),
+            i &&
+              (a.packaging &&
+                !t.some((n) => n.id === a.packaging.id) &&
+                (a.packaging = null),
+              (i.innerHTML = t
+                .map((n) => {
+                  const o = n.included
+                    ? "Included"
+                    : n.action === "request_quote"
+                      ? "Request quote"
+                      : `+${b(n.unitPrice, r.currency)} each${Number(n.setupPrice || 0) > 0 ? ` + ${b(n.setupPrice, r.currency)} setup` : ""}`;
+                  return `<button type="button" class="trends-method ${n.id === a.packaging?.id ? "is-active" : ""}" data-packaging-id="${s(n.id)}"><strong>${s(n.name)}</strong><small>${s(n.description || "")}</small><em>${s(o)}</em></button>`;
+                })
+                .join(""))));
+        },
+        j = () => {
+          ((e("[data-quantity-options]").innerHTML = S.map(
+            (t) =>
+              `<button type="button" class="trends-pill ${t.quantity === a.quantity ? "is-active" : ""}" data-quantity="${t.quantity}">${t.quantity}</button>`,
+          ).join("")),
+            (e("[data-custom-quantity]").value = a.quantity));
+        },
+        T = () => {
+          const t = _();
+          ((e("[data-summary-variant]").textContent =
+            a.variant?.title || "\u2014"),
+            (e("[data-summary-mode]").textContent =
+              a.mode === "unbranded"
+                ? "Unbranded"
+                : a.method?.name || "\u2014"),
+            (e("[data-summary-quantity]").textContent = a.quantity),
+            (e("[data-summary-unit]").textContent = b(t.unit, r.currency)),
+            (e("[data-summary-branding]").textContent = b(
+              t.branding,
+              r.currency,
+            )),
+            (e("[data-summary-additional-label]").textContent =
+              a.mode === "gift_ready" ? "Packaging / unit" : "Branding / unit"),
+            (e("[data-summary-setup]").textContent = b(t.setup, r.currency)),
+            (e("[data-summary-shipping]").textContent = b(
+              t.shippingCharge,
+              r.currency,
+            )),
+            (e("[data-summary-subtotal]").textContent = b(
+              t.subtotal,
+              r.currency,
+            )),
+            (e("[data-summary-branding-row]").hidden = a.mode === "unbranded"),
+            (e("[data-summary-packaging-row]").hidden = !a.packaging),
+            (e("[data-summary-packaging]").textContent =
+              a.packaging?.name || "\u2014"),
+            (e("[data-summary-setup-row]").hidden =
+              a.mode === "unbranded" || t.setup <= 0),
+            (e("[data-summary-shipping-row]").hidden = !t.shipping),
+            (e("[data-add-to-cart]").disabled =
+              !a.variant || a.packaging?.action === "request_quote"),
+            (e("[data-add-to-cart]").textContent =
+              a.packaging?.action === "request_quote"
+                ? "Request a quote"
+                : "Add selection to cart"));
+        },
+        E = () => {
+          (B(), F(), J(), Q(), j(), T());
+        };
+      (u.addEventListener("click", async (t) => {
+        const i = t.target.closest("[data-variant-id]"),
+          n = t.target.closest("[data-configured-option]"),
+          o = t.target.closest("[data-mode]"),
+          k = t.target.closest("[data-method-id]"),
+          g = t.target.closest("[data-packaging-id]"),
+          p = t.target.closest("[data-quantity]");
+        if (
+          (i &&
+            (a.variant = $.find((d) => String(d.id) === i.dataset.variantId)),
+          n)
+        ) {
+          const d = q.findIndex((l) => l.key === n.dataset.configuredOption),
+            m = q[d],
+            h = {};
+          (q.slice(0, d).forEach((l) => {
+            a.attributes[l.name] && (h[l.name] = a.attributes[l.name]);
+          }),
+            (h[m.name] = n.dataset.configuredValue));
+          const C = x.find(
+            (l) =>
+              l.available &&
+              Object.entries(h).every(
+                ([V, z]) => l.configured.attributes?.[V] === z,
+              ),
+          );
+          C &&
+            ((a.variant = C),
+            (a.attributes = { ...(C.configured.attributes || {}) }));
+        }
+        if (
+          (o && (a.mode = o.dataset.mode),
+          k && (a.method = P().find((d) => d.id === k.dataset.methodId)),
+          g &&
+            (a.packaging = (r.packagingMethods || []).find(
+              (d) => d.id === g.dataset.packagingId,
+            )),
+          p && (a.quantity = Number(p.dataset.quantity)),
+          i || n || o || k || g || p)
+        )
+          return E();
+        if (!t.target.closest("[data-add-to-cart]")) return;
+        const y = e("[data-add-to-cart]"),
+          c = e("[data-feedback]");
+        ((y.disabled = !0), (y.textContent = "Adding\u2026"));
+        try {
+          const d = await fetch(
+              `${window.Shopify?.routes?.root || "/"}apps/trends/configuration-variant`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  variantId: a.variant.id,
+                  variantSku: a.variant.sku,
+                  quantity: a.quantity,
+                  service: a.mode,
+                  brandingId: (a.mode === "branding" && a.method?.id) || null,
+                  brandingQuantity: a.mode === "branding" ? a.quantity : null,
+                  packagingId:
+                    (["premium", "custom"].includes(a.packaging?.type) &&
+                      a.packaging.methodId) ||
+                    null,
+                  packagingQuantity: ["premium", "custom"].includes(
+                    a.packaging?.type,
+                  )
+                    ? a.quantity
+                    : null,
+                  shippingService: null,
+                }),
+              },
+            ),
+            m = await d.json();
+          if (!d.ok || !m.ok)
+            throw new Error(
+              m.message || "Could not prepare this configuration",
+            );
+          const h = [
+              {
+                id: Number(m.numericVariantId),
+                quantity: m.cartQuantity || 1,
+                properties: m.properties || {},
+              },
+            ],
+            C = await fetch(
+              `${window.Shopify?.routes?.root || "/"}cart/add.js`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ items: h }),
+              },
+            ),
+            l = await C.json();
+          if (!C.ok)
+            throw new Error(l.description || "Could not add this selection");
+          ((c.textContent = "Selection added to cart."),
+            document.dispatchEvent(
+              new CustomEvent("cart:refresh", { bubbles: !0 }),
+            ));
+        } catch (d) {
+          c.textContent = d.message;
+        } finally {
+          ((y.disabled = !1), (y.textContent = "Add selection to cart"));
+        }
+      }),
+        e("[data-custom-quantity]").addEventListener("input", (t) => {
+          ((a.quantity = Math.max(1, Math.trunc(Number(t.target.value) || 1))),
+            j(),
+            T());
+        }),
+        E());
+    },
+    N = () => document.querySelectorAll("[data-trends-calculator]").forEach(I);
+  for (const u of ["DOMContentLoaded", "shopify:section:load"])
+    document.addEventListener(u, N);
+  N();
 })();

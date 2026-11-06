@@ -1,0 +1,1 @@
+ALTER TABLE "CronSyncLog" ADD COLUMN "detailsJson" TEXT NOT NULL DEFAULT '[]';

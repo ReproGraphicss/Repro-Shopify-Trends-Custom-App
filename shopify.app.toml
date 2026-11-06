@@ -2,12 +2,12 @@
 
 client_id = "6b7ae874ea420980a455395bc28f0188"
 name = "Repro Vendor Management"
-application_url = "https://example.com"
+application_url = "https://integrations.reprographics.co.nz"
 embedded = true
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "read_products,write_products,read_inventory,write_inventory,read_locations,read_publications,write_publications"
+scopes = "read_products,write_products,read_inventory,write_inventory,read_locations,read_publications,write_publications,read_themes,read_shipping,write_shipping,write_app_proxy,read_files,write_files"
 
 [product.metafields.app.demo_info]
 type = "single_line_text_field"
@@ -37,8 +37,12 @@ type = "multi_line_text_field"
 api_version = "2026-10"
 
 [auth]
-redirect_urls = [ "https://example.com/api/auth" ]
+redirect_urls = [ "https://integrations.reprographics.co.nz/auth/callback" ]
+
+[app_proxy]
+url = "/api/storefront"
+subpath = "trends"
+prefix = "apps"
 
 [build]
-include_config_on_deploy = true
 automatically_update_urls_on_dev = true

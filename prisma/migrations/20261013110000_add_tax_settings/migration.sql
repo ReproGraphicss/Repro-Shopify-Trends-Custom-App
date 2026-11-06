@@ -1,0 +1,2 @@
+ALTER TABLE "ShopSettings" ADD COLUMN "gstRate" REAL NOT NULL DEFAULT 0.15;
+ALTER TABLE "ShopSettings" ADD COLUMN "pricesExcludeGst" BOOLEAN NOT NULL DEFAULT true;

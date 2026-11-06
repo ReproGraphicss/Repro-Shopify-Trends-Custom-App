@@ -28,16 +28,31 @@ model Session {
 }
 
 model ShopSettings {
-  id                      String   @id @default(cuid()) @db.VarChar(30)
-  shop                    String   @unique @db.VarChar(255)
-  encryptedTrendsToken    String?  @db.Text
-  trendsBaseUrl           String   @default("https://nz.api.trends.nz") @db.VarChar(500)
-  globalMarkupPercent     Float    @default(60)
-  additionalMarkupPercent Float    @default(60)
-  defaultProductStatus    String   @default("DRAFT") @db.VarChar(30)
-  inventoryLocationId     String?  @db.VarChar(255)
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+  id                             String   @id @default(cuid()) @db.VarChar(30)
+  shop                           String   @unique @db.VarChar(255)
+  encryptedTrendsToken           String?  @db.Text
+  trendsBaseUrl                  String   @default("https://nz.api.trends.nz") @db.VarChar(500)
+  globalMarkupPercent            Float    @default(60)
+  fixedShippingAmount            Float    @default(15)
+  quoteNotificationEmail         String?  @db.Text
+  quoteWebhookUrl                String?  @db.Text
+  encryptedQuoteWebhookSecret    String?  @db.Text
+  encryptedGoHighLevelApiKey     String?  @db.Text
+  goHighLevelLocationId          String?  @db.VarChar(255)
+  gstRate                        Float    @default(0.15)
+  pricesExcludeGst               Boolean  @default(true)
+  defaultProductStatus           String   @default("DRAFT") @db.VarChar(30)
+  inventoryLocationId            String?  @db.VarChar(255)
+  productTemplateSuffix          String?  @db.VarChar(255)
+  shippingProfileId              String?  @db.VarChar(255)
+  selectedMarketIdsJson          String   @default("[]") @db.LongText
+  selectedPublicationIdsJson     String?  @db.LongText
+  variantTypesJson               String   @default("[]") @db.LongText
+  encryptedOpenAiApiKey          String?  @db.Text
+  aiVariantClassificationEnabled Boolean  @default(false)
+  aiVariantModel                 String   @default("gpt-5-mini") @db.VarChar(100)
+  createdAt                      DateTime @default(now())
+  updatedAt                      DateTime @updatedAt
 }
 
 model SyncProduct {
@@ -55,10 +70,13 @@ model SyncProduct {
   trendsDataJson             String?   @db.LongText
   trendsFetchedAt            DateTime?
   individualMarkup           Float?
-  additionalMarkup           Float?
+  customCorporatePackEnabled Boolean   @default(false)
+  configuredVariantJson      String?   @db.LongText
+  configuredVariantEnabled   Boolean   @default(false)
   status                     String    @default("PENDING") @db.VarChar(30)
   lastError                  String?   @db.Text
   shopifyProductId           String?   @db.VarChar(255)
+  shopifyMasterProductId     String?   @db.VarChar(255)
   shopifyAdditionalProductId String?   @db.VarChar(255)
   lastSyncedAt               DateTime?
   createdAt                  DateTime  @default(now())
@@ -101,4 +119,85 @@ model SyncRun {
   finishedAt DateTime?
 
   @@index([shop, startedAt])
+}
+
+model CronSyncLog {
+  id                 String    @id @default(cuid()) @db.VarChar(30)
+  shop               String    @db.VarChar(255)
+  mode               String    @db.VarChar(30)
+  status             String    @default("RUNNING") @db.VarChar(30)
+  products           Int       @default(0)
+  processed          Int       @default(0)
+  updated            Int       @default(0)
+  failed             Int       @default(0)
+  remaining          Int       @default(0)
+  priceChecked       Int       @default(0)
+  priceChanged       Int       @default(0)
+  priceUnchanged     Int       @default(0)
+  inventoryChecked   Int       @default(0)
+  inventoryChanged   Int       @default(0)
+  inventoryUnchanged Int       @default(0)
+  durationMs         Int       @default(0)
+  errorsJson         String    @default("[]") @db.LongText
+  detailsJson        String    @default("[]") @db.LongText
+  startedAt          DateTime  @default(now())
+  finishedAt         DateTime?
+
+  @@index([shop, startedAt])
+  @@index([shop, mode])
+}
+
+model TemporaryConfiguredVariant {
+  id                String   @id @default(cuid()) @db.VarChar(30)
+  shop              String   @db.VarChar(255)
+  sourceProductId   String   @db.VarChar(255)
+  sourceVariantId   String   @db.VarChar(255)
+  targetProductId   String   @db.VarChar(255)
+  shopifyVariantId  String   @unique @db.VarChar(255)
+  productCode       String   @db.VarChar(100)
+  variantSku        String   @db.VarChar(100)
+  service           String   @db.VarChar(30)
+  requestedQuantity Int
+  price             Float
+  configurationJson String   @db.LongText
+  expiresAt         DateTime
+  createdAt         DateTime @default(now())
+
+  @@index([shop, expiresAt])
+  @@index([shop, sourceProductId])
+  @@index([shop, targetProductId])
+}
+
+model QuoteRequest {
+  id               String   @id @default(cuid()) @db.VarChar(30)
+  shop             String   @db.VarChar(255)
+  customerType     String   @db.VarChar(100)
+  contactName      String   @db.VarChar(255)
+  contactPhone     String?  @db.VarChar(100)
+  contactEmail     String   @db.VarChar(320)
+  contactCompany   String?  @db.VarChar(255)
+  productsJson     String   @db.LongText
+  marketingConsent Boolean  @default(false)
+  source           String?  @db.VarChar(255)
+  pageUrl          String?  @db.Text
+  status           String   @default("NEW") @db.VarChar(30)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([shop, status])
+  @@index([shop, createdAt])
+}
+
+model QuoteWebhook {
+  id              String   @id @default(cuid()) @db.VarChar(30)
+  shop            String   @db.VarChar(255)
+  name            String   @db.VarChar(120)
+  url             String   @db.VarChar(500)
+  encryptedSecret String   @db.Text
+  enabled         Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([shop, enabled])
+  @@unique([shop, url])
 }

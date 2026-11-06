@@ -1,3 +1,10 @@
+{% if product.tags contains 'TRENDS Hidden Product' %}
+  <style>body { visibility: hidden !important; }</style>
+  <script>
+    window.location.replace('{{ routes.cart_url }}');
+  </script>
+{% endif %}
+
 {% assign trends_config = product.metafields.trends.product_configuration.value %}
 {% if trends_config != blank %}
   <section
@@ -13,6 +20,7 @@
           {% for variant in product.variants %}
             {
               "id": {{ variant.id | json }},
+              "sku": {{ variant.sku | json }},
               "title": {{ variant.title | json }},
               "available": {{ variant.available | json }}
             }{% unless forloop.last %},{% endunless %}
@@ -29,8 +37,8 @@
 
     <div class="trends-calculator__layout">
       <div class="trends-calculator__builder">
-        <div class="trends-step">
-          <div class="trends-step__heading"><span>1</span><h3>Choose your colour</h3></div>
+        <div class="trends-step" data-variant-step>
+          <div class="trends-step__heading"><span>1</span><h3 data-variant-heading>Choose your variant</h3></div>
           <div class="trends-choice-grid" data-variant-options></div>
         </div>
 
@@ -43,9 +51,6 @@
             <button type="button" class="trends-card" data-mode="branding">
               <strong>Add Branding</strong><small>Add your logo or artwork</small>
             </button>
-            <button type="button" class="trends-card" data-mode="gift_ready">
-              <strong>Gift Ready</strong><small>Add premium packaging</small>
-            </button>
           </div>
         </div>
 
@@ -55,8 +60,13 @@
           <div class="trends-method-grid" data-method-options></div>
         </div>
 
+        <div class="trends-step" data-packaging-step>
+          <div class="trends-step__heading"><span data-packaging-step-number>3</span><h3>Packaging (optional)</h3></div>
+          <div class="trends-packaging-grid" data-packaging-options></div>
+        </div>
+
         <div class="trends-step">
-          <div class="trends-step__heading"><span data-quantity-step>3</span><h3>How many do you need?</h3></div>
+          <div class="trends-step__heading"><span data-quantity-step>4</span><h3>How many do you need?</h3></div>
           <div class="trends-quantity-options" data-quantity-options></div>
           <label class="trends-custom-quantity">
             <span>Custom quantity</span>
@@ -64,24 +74,23 @@
           </label>
         </div>
 
-        <div class="trends-product-information" data-product-information></div>
       </div>
 
       <aside class="trends-summary" aria-live="polite">
         <p class="trends-summary__eyebrow">Your selection</p>
         <h3 data-summary-title>{{ product.title | escape }}</h3>
         <dl>
-          <div><dt>Colour</dt><dd data-summary-variant>—</dd></div>
+          <div><dt data-summary-variant-label>Variant</dt><dd data-summary-variant>—</dd></div>
           <div><dt>Service</dt><dd data-summary-mode>Unbranded</dd></div>
+          <div data-summary-packaging-row hidden><dt>Packaging</dt><dd data-summary-packaging>—</dd></div>
           <div><dt>Quantity</dt><dd data-summary-quantity>—</dd></div>
-          <div><dt>Unit price</dt><dd data-summary-unit>—</dd></div>
-          <div data-summary-branding-row hidden><dt>Branding / unit</dt><dd data-summary-branding>—</dd></div>
+          <div><dt>Final unit price</dt><dd data-summary-unit>—</dd></div>
+          <div data-summary-branding-row hidden><dt data-summary-additional-label>Branding / unit</dt><dd data-summary-branding>—</dd></div>
           <div data-summary-setup-row hidden><dt>Setup fee</dt><dd data-summary-setup>—</dd></div>
+          <div data-summary-shipping-row hidden><dt>Shipping &amp; handling</dt><dd data-summary-shipping>—</dd></div>
         </dl>
         <div class="trends-summary__totals">
-          <div><span>Subtotal (excl. GST)</span><strong data-summary-subtotal>—</strong></div>
-          <div><span>GST</span><strong data-summary-gst>—</strong></div>
-          <div class="trends-summary__grand"><span>Total (incl. GST)</span><strong data-summary-total>—</strong></div>
+          <div class="trends-summary__grand"><span>Total</span><strong data-summary-subtotal>—</strong></div>
         </div>
         <button type="button" class="trends-add-button" data-add-to-cart>Add selection to cart</button>
         <p class="trends-feedback" data-feedback role="status"></p>
@@ -106,4 +115,3 @@
   ]
 }
 {% endschema %}
-

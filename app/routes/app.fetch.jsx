@@ -1,6 +1,5 @@
 import prisma from "../db.server";
 import { authenticate } from "../shopify.server";
-import { decryptSecret } from "../lib/crypto.server";
 import { TrendsClient } from "../lib/trends.server";
 import { normalizeTrendsUrl } from "../lib/trends-url";
 
@@ -14,7 +13,6 @@ export const action = async ({ request }) => {
         id,
         shop: session.shop,
         sourceFile: { not: null },
-        includedInCurrentSheet: true,
       },
     }),
     prisma.shopSettings.upsert({
@@ -28,11 +26,7 @@ export const action = async ({ request }) => {
       { ok: false, message: "Sheet item not found" },
       { status: 404 },
     );
-  const token =
-    process.env.TRENDS_API_TOKEN ||
-    (settings.encryptedTrendsToken
-      ? decryptSecret(settings.encryptedTrendsToken)
-      : "");
+  const token = settings.encryptedTrendsToken || "";
   if (!token)
     return Response.json(
       { ok: false, message: "Configure the TRENDS API token in Settings" },

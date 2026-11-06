@@ -4,7 +4,7 @@ application_url = "https://integrations.reprographics.co.nz"
 embedded = true
 
 [access_scopes]
-scopes = "read_products,write_products,read_inventory,write_inventory,read_locations,read_publications,write_publications"
+scopes = "read_products,write_products,read_inventory,write_inventory,read_locations,read_publications,write_publications,read_themes,read_shipping,write_shipping,write_app_proxy,read_files,write_files"
 
 [webhooks]
 api_version = "2026-07"
@@ -12,6 +12,10 @@ api_version = "2026-07"
 [auth]
 redirect_urls = [ "https://integrations.reprographics.co.nz/auth/callback" ]
 
+[app_proxy]
+url = "/api/storefront"
+subpath = "trends"
+prefix = "apps"
+
 [build]
-include_config_on_deploy = true
 automatically_update_urls_on_dev = false
